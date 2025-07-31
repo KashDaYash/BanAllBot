@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime
 import time
 from pyrogram.enums import ChatMemberStatus
-from config import API_ID, API_HASH, BOT_TOKEN
+from config import API_ID, API_HASH, BOT_TOKEN, LOGGER_ID
 
 app = Client("banallbot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
