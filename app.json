@@ -9,11 +9,5 @@
     "BOT_TOKEN": { "description": "Your Telegram Bot Token", "required": true },
     "LOGGER_ID": { "description": "Your Telegram Group Chat ID", "required": true }
   },
-  "buildpacks": [
-    { "url": "heroku/python" },
-    { "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git" }
-  ],
-  "formation": {
-    "worker": { "quantity": 1, "size": "standard-1X" }
-  }
+  "stack": "container"
 }
