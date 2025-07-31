@@ -1,36 +1,19 @@
 {
   "name": "BanAllBot",
-  "description": "A Telegram bot to mass-ban users using Pyrogram.",
+  "description": "A Telegram bot to mass‑ban users using Pyrogram.",
   "repository": "https://github.com/KashDaYash/BanAllBot",
-  "keywords": ["telegram", "bot", "pyrogram", "heroku"],
+  "keywords": ["telegram","bot","pyrogram","heroku"],
   "env": {
-    "API_ID": {
-      "description": "Your Telegram API ID",
-      "required": true
-    },
-    "API_HASH": {
-      "description": "Your Telegram API HASH",
-      "required": true
-    },
-    "BOT_TOKEN": {
-      "description": "Your Telegram Bot Token",
-      "required": true
-    },
-   "LOGGER_ID": {
-      "description": "Your Telegram Group Chat ID",
-      "required": true
-    },
+    "API_ID": { "description": "Your Telegram API ID", "required": true },
+    "API_HASH": { "description": "Your Telegram API hash", "required": true },
+    "BOT_TOKEN": { "description": "Your Telegram Bot Token", "required": true },
+    "LOGGER_ID": { "description": "Your Telegram Group Chat ID", "required": true }
   },
   "buildpacks": [
-    {"url": "heroku/python"},
-    {"url": "heroku/nodejs"},
-    {"url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"}
+    { "url": "heroku/python" },
+    { "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git" }
   ],
   "formation": {
-    "worker": {
-       "quantity": 1,
-       "size": "basic"
-          }
-      },
-  "stack": "container"
- }
+    "worker": { "quantity": 1, "size": "standard-1X" }
+  }
+}
