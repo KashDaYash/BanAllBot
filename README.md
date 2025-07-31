@@ -17,7 +17,7 @@ Built with [Pyrogram](https://github.com/pyrogram/pyrogram).
 
 <p align="center"><a href="https://www.heroku.com/deploy?template=https://github.com/KashDaYash/BanAllBot">
   <img src="https://www.herokucdn.com/deploy/button.svg" alt="Deploy">
-</a> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-Purple?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
+</a></p>
 
 1. Click on "Deploy to Heroku" or use:
 2. Set `API_ID`, `API_HASH`, `BOT_TOKEN` in Heroku Config Vars.
