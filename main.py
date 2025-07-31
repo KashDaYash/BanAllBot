@@ -6,7 +6,9 @@ from datetime import datetime
 import time
 from pyrogram.enums import ChatMemberStatus
 from config import API_ID, API_HASH, BOT_TOKEN, LOGGER_ID
+import uvloop 
 
+uvloop.install()
 app = Client("banallbot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, workers=4)
 
 @app.on_message(filters.command("start"))
