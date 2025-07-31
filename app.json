@@ -15,7 +15,11 @@
     "BOT_TOKEN": {
       "description": "Your Telegram Bot Token",
       "required": true
-    }
+    },
+   "LOGGER_ID": {
+      "description": "Your Telegram Group Chat ID",
+      "required": true
+    },
   },
   "buildpacks": [
     {"url": "heroku/python"},
