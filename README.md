@@ -15,7 +15,7 @@ Built with [Pyrogram](https://github.com/pyrogram/pyrogram).
     ─「 ᴅᴇᴩʟᴏʏ ᴏɴ ʜᴇʀᴏᴋᴜ 」─
 </h3>
 
-<p align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/KashDaYash/BanAllBot"> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-voilet?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
+<p align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/KashDaYash/BanAllBot"> <img src="https://img.shields.io/badge/Deploy%20On%20Heroku-Voilet?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
 
 1. Click on "Deploy to Heroku" or use:
 2. Set `API_ID`, `API_HASH`, `BOT_TOKEN` in Heroku Config Vars.
