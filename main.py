@@ -131,10 +131,10 @@ async def stop_process(client: Client, callback_query: CallbackQuery):
     await callback_query.answer("🛑 Ban process stopped!")
 
 
-@Client.on_message(filters.command("ban") & filters.group)
-async def ban_single_user(bot, message: Message):
+@app.on_message(filters.command("ban") & filters.group)
+async def ban_single_user(client:Client, message: Message):
     # Check admin rights
-    user_status = await bot.get_chat_member(message.chat.id, message.from_user.id)
+    user_status = await app.get_chat_member(message.chat.id, message.from_user.id)
     if user_status.status not in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]:
         return await message.reply("❌ only admin can do this.")
 
@@ -147,7 +147,7 @@ async def ban_single_user(bot, message: Message):
         arg = message.command[1]
         if arg.startswith("@"):
             try:
-                user = await bot.get_users(arg)
+                user = await app.get_users(arg)
                 target_user = user.id
             except UsernameNotOccupied:
                 return await message.reply("❌ Username not exist.")
@@ -161,7 +161,7 @@ async def ban_single_user(bot, message: Message):
 
     # Attempt to ban
     try:
-        await bot.ban_chat_member(message.chat.id, target_user)
+        await app.ban_chat_member(message.chat.id, target_user)
         await message.reply(f"✅ User `{target_user}` banned successfully.")
     except UserNotParticipant:
         await message.reply("⚠️ User is not in the group.")
