@@ -18,6 +18,7 @@ async def start_handler(client: Client, message: Message):
         🚫 This bot helps group admins to **ban all non-admin members** quickly and safely.\n\n
         **⚙ Available Command:**\n
         `/banall` — Ban all non-admins in the group\n\n
+       `/ban` — Ban a non-admins in the group\n\n
         **📌 Notes:**\n
         • Bot must be **admin with ban permissions**.\n
         • Only **group admins** can use the command.\n
