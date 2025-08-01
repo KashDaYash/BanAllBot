@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.errors import FloodWait, PeerIdInvalid, InviteHashExpired
+from pyrogram.errors import FloodWait, PeerIdInvalid, InviteHashExpired, RPCError, UsernameNotOccupied, UserNotParticipant
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import asyncio
 from datetime import datetime
@@ -124,10 +124,49 @@ async def stop_process(client: Client, callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
     member = await client.get_chat_member(chat_id, user_id)
-    if member.status not in ("administrator", "creator"):
-        return await callback_query.answer("❌ Sirf admin hi rokh sakta hai!", show_alert=True)
+    if member.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
+        return await callback_query.answer("❌ only admin can do this!", show_alert=True)
 
     stop_flags[chat_id] = True
     await callback_query.answer("🛑 Ban process stopped!")
+
+
+@Client.on_message(filters.command("ban") & filters.group)
+async def ban_single_user(bot, message: Message):
+    # Check admin rights
+    user_status = await bot.get_chat_member(message.chat.id, message.from_user.id)
+    if user_status.status not in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]:
+        return await message.reply("❌ only admin can do this.")
+
+    # Determine target
+    target_user = None
+    if message.reply_to_message:
+        target_user = message.reply_to_message.from_user.id
+
+    elif len(message.command) > 1:
+        arg = message.command[1]
+        if arg.startswith("@"):
+            try:
+                user = await bot.get_users(arg)
+                target_user = user.id
+            except UsernameNotOccupied:
+                return await message.reply("❌ Username not exist.")
+        else:
+            try:
+                target_user = int(arg)
+            except ValueError:
+                return await message.reply("❌ Please enter a valid user_id.")
+    else:
+        return await message.reply("⚠️ reply any user or username/user_id.\nExample:\n`/ban @username` or `/ban 123456789`")
+
+    # Attempt to ban
+    try:
+        await bot.ban_chat_member(message.chat.id, target_user)
+        await message.reply(f"✅ User `{target_user}` banned successfully.")
+    except UserNotParticipant:
+        await message.reply("⚠️ User is not in the group.")
+    except RPCError as e:
+        await message.reply(f"❌ Ban failed: {e}")
+
 
 app.run()
