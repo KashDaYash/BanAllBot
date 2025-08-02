@@ -1,4 +1,4 @@
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.errors import FloodWait, PeerIdInvalid, InviteHashExpired, RPCError, UsernameNotOccupied, UserNotParticipant
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import asyncio
@@ -268,4 +268,6 @@ async def toggle_usernameguard_cb(client: Client, query: CallbackQuery):
         await query.answer("❌ Username Guard disabled.")
         await query.message.edit_text("🛡 Username Guard is now **DISABLED** ❌")       
         
-app.run()
+app.start()
+app.send_message(LOGGER_ID, f"{(app.get_me()).mention} Started 💫")
+idle()
