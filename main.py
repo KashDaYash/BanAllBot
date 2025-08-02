@@ -269,5 +269,5 @@ async def toggle_usernameguard_cb(client: Client, query: CallbackQuery):
         await query.message.edit_text("🛡 Username Guard is now **DISABLED** ❌")       
         
 app.start()
-app.send_message(LOGGER_ID, f"{(app.get_me()).mention} Started 💫")
+app.send_message(chat_id=, text=f"{(app.get_me()).mention} Started 💫")
 idle()
