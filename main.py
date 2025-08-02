@@ -7,6 +7,9 @@ import time
 from pyrogram.enums import ChatMemberStatus
 from config import API_ID, API_HASH, BOT_TOKEN, LOGGER_ID
 import uvloop 
+import json
+import os
+
 
 uvloop.install()
 app = Client("banallbot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN, workers=4)
@@ -170,4 +173,99 @@ async def ban_single_user(client:Client, message: Message):
         await message.reply(f"❌ Ban failed: {e}")
 
 
+@app.on_message(filters.command("unban") & filters.group)
+async def unban_user(client: Client, message: Message):
+    # Admin check
+    user_status = await app.get_chat_member(message.chat.id, message.from_user.id)
+    if user_status.status not in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]:
+        return await message.reply("❌ Sirf admins hi ye command chala sakte hain.")
+
+    # Determine target user
+    target_user = None
+    if message.reply_to_message:
+        target_user = message.reply_to_message.from_user.id
+
+    elif len(message.command) > 1:
+        arg = message.command[1]
+        if arg.startswith("@"):
+            try:
+                user = await app.get_users(arg)
+                target_user = user.id
+            except UsernameNotOccupied:
+                return await message.reply("❌ Username galat hai ya exist nahi karta.")
+        else:
+            try:
+                target_user = int(arg)
+            except ValueError:
+                return await message.reply("❌ User ID valid number hona chahiye.")
+    else:
+        return await message.reply("⚠️ Kisi user ko reply karo ya username/user_id do.\nExample:\n`/unban @username` ya `/unban 123456789`")
+
+    # Attempt to unban
+    try:
+        await app.unban_chat_member(message.chat.id, target_user)
+        await message.reply(f"✅ User `{target_user}` has been unbanned.")
+    except RPCError as e:
+        await message.reply(f"❌ Unban failed: {e}")
+        
+
+
+GUARD_FILE = "chats.json"
+
+def load_enabled_chats():
+    if not os.path.exists(GUARD_FILE):
+        return []
+    with open(GUARD_FILE, "r") as f:
+        return json.load(f)
+
+def save_enabled_chats(data):
+    with open(GUARD_FILE, "w") as f:
+        json.dump(data, f)
+
+# /usernameguard command with buttons
+@app.on_message(filters.command("nousername") & filters.group)
+async def usernameguard_command(client: Client, message: Message):
+    user_status = await app.get_chat_member(message.chat.id, message.from_user.id)
+    if user_status.status not in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]:
+        return await message.reply("❌ Sirf admins hi ye feature control kar sakte hain.")
+
+    enabled_chats = load_enabled_chats()
+    is_enabled = message.chat.id in enabled_chats
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Enable", callback_data=f"usernameguard_enable_{message.chat.id}"),
+            InlineKeyboardButton("❌ Disable", callback_data=f"usernameguard_disable_{message.chat.id}")
+        ]
+    ])
+
+    status_text = "🛡 Username Guard is currently **ENABLED** ✅" if is_enabled else "🛡 Username Guard is currently **DISABLED** ❌"
+    await message.reply(status_text, reply_markup=keyboard)
+
+# Callback handler for the toggle buttons
+@app.on_callback_query(filters.regex(r"usernameguard_(enable|disable)_(\-?\d+)"))
+async def toggle_usernameguard_cb(client: Client, query: CallbackQuery):
+    action, chat_id = query.data.split("_")[1:]
+    chat_id = int(chat_id)
+
+    user_status = await app.get_chat_member(chat_id, query.from_user.id)
+    if user_status.status not in [ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR]:
+        return await query.answer("❌ Sirf admins hi ye kar sakte hain.", show_alert=True)
+
+    enabled_chats = load_enabled_chats()
+
+    if action == "enable":
+        if chat_id not in enabled_chats:
+            enabled_chats.append(chat_id)
+            save_enabled_chats(enabled_chats)
+        await query.answer("✅ Username Guard enabled.")
+        await query.message.edit_text("🛡 Username Guard is now **ENABLED** ✅")
+
+    elif action == "disable":
+        if chat_id in enabled_chats:
+            enabled_chats.remove(chat_id)
+            save_enabled_chats(enabled_chats)
+        await query.answer("❌ Username Guard disabled.")
+        await query.message.edit_text("🛡 Username Guard is now **DISABLED** ❌")       
+        
 app.run()
