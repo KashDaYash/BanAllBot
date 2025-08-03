@@ -2,3 +2,4 @@ pyrogram
 tgcrypto
 uvloop
 asyncio
+sqlite3 
