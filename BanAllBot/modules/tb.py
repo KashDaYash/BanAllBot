@@ -6,6 +6,8 @@ import math
 from typing import Optional
 from urllib.parse import urlencode, urlparse, parse_qs
 import base64
+import subprocess
+import sys
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
@@ -13,7 +15,8 @@ from pyrogram.errors import FloodWait, MessageNotModified
 
 import httpx
 from playwright.async_api import async_playwright
-from BanAllBot import app 
+from BanAllBot import app
+
 # ---- Helpers ----------------------------------------------------------------
 
 TERABOX_RX = re.compile(r"https?://(?:www\.)?(?:terabox|1024terabox)\.com/s/\S+", re.I)
@@ -51,12 +54,43 @@ async def edit_safe(msg: Message, text: str):
     except MessageNotModified:
         pass
 
+# ---- Playwright auto-install fallback ---------------------------------------
+
+def ensure_playwright_chromium():
+    """
+    If Playwright browsers are not installed on the host (e.g., Heroku fresh dyno),
+    try installing Chromium at runtime to avoid:
+    BrowserType.launch: Executable doesn't exist at .../chromium_headless_shell...
+    """
+    # common cache locations
+    candidates = [
+        os.path.expanduser("~/.cache/ms-playwright"),
+        "/app/.cache/ms-playwright",
+    ]
+    for path in candidates:
+        if os.path.exists(path) and any("chromium" in d for d in os.listdir(path)):
+            return  # already present
+
+    # attempt install (with deps if available)
+    cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
+    # if you want to try deps too (works in many containers), uncomment:
+    # cmd = [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"]
+
+    try:
+        subprocess.run(cmd, check=True)
+    except Exception as e:
+        # don't crash app startup—raise a clear error at launch time instead
+        raise RuntimeError(f"Failed to install Playwright Chromium at runtime: {e}")
+
 # ---- Core scraping & download -----------------------------------------------
 
 async def capture_api_json(share_url: str, wait_seconds: int = 20, headless: bool = True) -> list[dict]:
     """
     Open teradownloader /download?l=... and capture the JSON returned by /api?data=...
     """
+    # Ensure browsers exist before launch
+    ensure_playwright_chromium()
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=headless)
         context = await browser.new_context(user_agent=(
@@ -118,14 +152,19 @@ async def download_with_progress(url: str, dest_path: str, progress_cb=None):
 
 @app.on_message(filters.command("download"))
 async def handle_text(_, msg: Message):
-    if len(msg.text) < 1:
-      return await msg.reply("Please give me /download terabox_url")
-    m = TERABOX_RX.search(msg.text or "")
+    # Expect: /download <terabox_url>
+    # Proper parsing using Pyrogram's parsed command list
+    if not getattr(msg, "command", None) or len(msg.command) < 2:
+        return await msg.reply_text("Usage: `/download <terabox_share_url>`", quote=True)
+
+    possible_url = msg.command[1]
+    # If user pasted extra text, try to find Terabox link anywhere in message
+    m = TERABOX_RX.search(possible_url) or TERABOX_RX.search(msg.text or "")
     if not m:
-        return await msg.reply_text("Please send a valid Terabox share URL.")
+        return await msg.reply_text("Please send a valid Terabox share URL.", quote=True)
 
     share_url = m.group(0)
-    status = await msg.reply_text("⏳ Getting download info…")
+    status = await msg.reply_text("⏳ Getting download info…", quote=True)
 
     # Some hosts need headful to pass Turnstile; we try headless first.
     headless = os.environ.get("HEADLESS", "true").lower() != "false"
@@ -149,7 +188,7 @@ async def handle_text(_, msg: Message):
     size_h = human(int(size_str)) if size_str and str(size_str).isdigit() else "unknown"
     await edit_safe(status, f"⬇️ Downloading **{filename}** ({size_h})…")
 
-    # Telegram bot practical limit ~2GB (some setups 4GB), be cautious:
+    # Telegram bot practical limit ~2GB (some setups 4GB)
     MAX_BOT_SIZE = int(os.environ.get("MAX_BOT_SIZE_BYTES", str(2 * 1024 * 1024 * 1024)))
 
     tmpdir = tempfile.mkdtemp(prefix="tdl_")
@@ -159,7 +198,6 @@ async def handle_text(_, msg: Message):
         try:
             if total > 0:
                 pct = downloaded * 100 // total
-                # Throttle edits a bit
                 if pct % 5 == 0:  # every 5%
                     await edit_safe(status, f"⬇️ Downloading **{filename}** — {pct}% ({human(downloaded)}/{human(total)})")
             else:
@@ -190,7 +228,6 @@ async def handle_text(_, msg: Message):
 
     await edit_safe(status, "📤 Uploading to Telegram…")
 
-    # Try sending as video (streamable). Fallback to document if needed.
     caption = f"{filename}\nSize: {size_h}"
     try:
         await msg.reply_video(out_path, caption=caption, supports_streaming=True)
@@ -199,5 +236,5 @@ async def handle_text(_, msg: Message):
         await msg.reply_document(out_path, caption=caption)
         await status.delete()
 
-    # Cleanup optional: tmpdir will be left; you can remove if you like.
-    # import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
+    # Optional cleanup:
+    # import shutil; shutil.rmtree(tmpdir, ignore_errors=True) 
