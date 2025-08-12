@@ -26,8 +26,4 @@
     { "url": "heroku/python" },
     { "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git" }
   ],
-
-  "scripts": {
-    "release": "python -m playwright install --with-deps chromium || python -m playwright install chromium"
-  }
 }
