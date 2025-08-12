@@ -1,31 +1,33 @@
 {
   "name": "BanAllBot",
-  "description": "A Telegram bot to mass‑ban users using Pyrogram.",
+  "description": "A Telegram bot to mass-ban users using Pyrogram.",
   "repository": "https://github.com/KashDaYash/BanAllBot",
-  "keywords": ["telegram","bot","pyrogram","heroku"],
+  "keywords": ["telegram", "bot", "pyrogram", "heroku"],
+
   "env": {
-    "API_ID": { "description": "Your Telegram API ID", "required": true },
-    "API_HASH": { "description": "Your Telegram API hash", "required": true },
+    "API_ID":    { "description": "Your Telegram API ID", "required": true },
+    "API_HASH":  { "description": "Your Telegram API hash", "required": true },
     "BOT_TOKEN": { "description": "Your Telegram Bot Token", "required": true },
-    "LOGGER_ID": { "description": "Your Telegram Group Chat ID", "required": true }
+    "LOGGER_ID": { "description": "Your Telegram Group Chat ID", "required": true },
+
+    "HEADLESS":        { "description": "Run Playwright headless (true/false)", "required": false, "value": "true" },
+    "WAIT_SECONDS":    { "description": "Wait on teradownloader page", "required": false, "value": "20" },
+    "MAX_BOT_SIZE_BYTES": { "description": "Max upload size (bytes)", "required": false, "value": "2147483648" }
   },
+
   "formation": {
-    "worker": {
-      "quantity": 1,
-      "size": "basic"
-    }
+    "worker": { "quantity": 1, "size": "basic" }
   },
+
+  "stack": "heroku-22",
+
   "buildpacks": [
-    {
-       "url": "heroku/python"
-    },
-    {
-        "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git"
-    },
-    {
-        "url": "heroku/nodejs"
-    }
-  ]
-  "stack" : "heroku-22"
+    { "url": "https://github.com/playwright-community/heroku-playwright-buildpack" },
+    { "url": "heroku/python" },
+    { "url": "https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest.git" }
+  ],
+
+  "scripts": {
+    "release": "python -m playwright install --with-deps chromium || python -m playwright install chromium"
+  }
 }
-     
