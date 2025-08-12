@@ -116,7 +116,7 @@ async def download_with_progress(url: str, dest_path: str, progress_cb=None):
 
 # ---- Bot --------------------------------------------------------------------
 
-@app.on_message(filters.command(["download"))
+@app.on_message(filters.command("download"))
 async def handle_text(_, msg: Message):
     if len(msg.text) < 1:
       return await msg.reply("Please give me /download terabox_url")
