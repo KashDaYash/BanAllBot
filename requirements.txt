@@ -2,3 +2,7 @@ pyrogram
 tgcrypto
 uvloop
 asyncio
+requests
+playwright
+tqdm
+httpx
