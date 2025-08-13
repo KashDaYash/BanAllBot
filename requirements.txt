@@ -3,6 +3,6 @@ tgcrypto
 uvloop
 asyncio
 requests
-playwright
-tqdm
 httpx
+selenium
+selenium-wire webdriver-manager-chrome
