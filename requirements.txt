@@ -5,4 +5,5 @@ asyncio
 requests
 httpx
 selenium
-selenium-wire webdriver-manager-chrome
+selenium-wire 
+webdriver-manager-chrome
