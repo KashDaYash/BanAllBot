@@ -3,21 +3,27 @@ import re
 import asyncio
 import tempfile
 import math
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import urlencode, urlparse, parse_qs
 import base64
-import subprocess
+import time
+import json
 import sys
+
+# Selenium Imports - NUEVO
+from seleniumwire import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait, MessageNotModified
 
 import httpx
-from playwright.async_api import async_playwright
 from BanAllBot import app
 
-# ---- Helpers ----------------------------------------------------------------
+# ---- Helpers (Sin cambios) --------------------------------------------------
 
 TERABOX_RX = re.compile(r"https?://(?:www\.)?(?:terabox|1024terabox)\.com/s/\S+", re.I)
 
@@ -54,77 +60,58 @@ async def edit_safe(msg: Message, text: str):
     except MessageNotModified:
         pass
 
-# ---- Playwright auto-install fallback ---------------------------------------
+# ---- Selenium auto-install (manejado por webdriver-manager) --------
+# La función ensure_playwright_chromium ya no es necesaria.
+# webdriver-manager se encarga de descargar el driver correcto.
 
-def ensure_playwright_chromium():
+# ---- Core scraping & download (Reescrito con Selenium) ---------------------
+
+def capture_api_json_selenium(share_url: str, wait_seconds: int = 20, headless: bool = True) -> List[dict]:
     """
-    If Playwright browsers are not installed on the host (e.g., Heroku fresh dyno),
-    try installing Chromium at runtime to avoid:
-    BrowserType.launch: Executable doesn't exist at .../chromium_headless_shell...
+    Abre teradownloader /download?l=... usando Selenium y captura el JSON
+    devuelto por /api?data=... usando selenium-wire.
     """
-    # common cache locations
-    candidates = [
-        os.path.expanduser("~/.cache/ms-playwright"),
-        "/app/.cache/ms-playwright",
-    ]
-    for path in candidates:
-        if os.path.exists(path) and any("chromium" in d for d in os.listdir(path)):
-            return  # already present
+    options = Options()
+    if headless:
+        options.add_argument("--headless")
+    
+    # Argumentos comunes para ejecutar en servidores/contenedores
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
-    # attempt install (with deps if available)
-    cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
-    # if you want to try deps too (works in many containers), uncomment:
-    # cmd = [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"]
+    # Usar webdriver-manager para instalar y configurar el driver automáticamente
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
+    api_items = None
+    
     try:
-        subprocess.run(cmd, check=True)
-    except Exception as e:
-        # don't crash app startup—raise a clear error at launch time instead
-        raise RuntimeError(f"Failed to install Playwright Chromium at runtime: {e}")
-
-# ---- Core scraping & download -----------------------------------------------
-
-async def capture_api_json(share_url: str, wait_seconds: int = 20, headless: bool = True) -> list[dict]:
-    """
-    Open teradownloader /download?l=... and capture the JSON returned by /api?data=...
-    """
-    # Ensure browsers exist before launch
-    ensure_playwright_chromium()
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
-        context = await browser.new_context(user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ))
-        page = await context.new_page()
-
-        api_items = None
-
-        async def on_response(res):
-            nonlocal api_items
-            url = res.url
-            if url.startswith("https://teradownloader.com/api?data="):
-                ct = (res.headers.get("content-type") or "").lower()
-                if "application/json" in ct:
-                    try:
-                        api_items = await res.json()
-                    except Exception:
-                        pass
-
-        page.on("response", on_response)
-
         q = urlencode({"l": share_url})
-        await page.goto(f"https://teradownloader.com/download?{q}", wait_until="networkidle", timeout=120000)
+        driver.get(f"https://teradownloader.com/download?{q}")
 
-        # Site displays "Please wait 15-20 sec..."
-        await asyncio.sleep(wait_seconds)
-        await page.wait_for_load_state("networkidle")
-        await asyncio.sleep(2)
+        # El sitio muestra "Please wait 15-20 sec..."
+        print(f"Waiting for {wait_seconds} seconds for the page to make API calls...")
+        time.sleep(wait_seconds)
 
-        await context.close()
-        await browser.close()
+        # Buscar en las peticiones capturadas por selenium-wire
+        for request in driver.requests:
+            if request.response and request.url.startswith("https://teradownloader.com/api?data="):
+                # Asegurarse de que la respuesta es JSON
+                content_type = request.response.headers.get("Content-Type", "")
+                if "application/json" in content_type:
+                    try:
+                        # El cuerpo de la respuesta está en bytes, decodificar y cargar como JSON
+                        body_decoded = request.response.body.decode('utf-8')
+                        api_items = json.loads(body_decoded)
+                        print("API JSON response captured successfully.")
+                        break # Salir del bucle una vez encontrado
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                        print(f"Failed to decode API response: {e}")
+                        pass
+    finally:
+        # Asegurarse de que el navegador se cierre
+        driver.quit()
 
     if not api_items:
         raise RuntimeError(
@@ -133,6 +120,7 @@ async def capture_api_json(share_url: str, wait_seconds: int = 20, headless: boo
         )
     return api_items
 
+# ---- Función de descarga (Sin cambios) --------------------------------------
 async def download_with_progress(url: str, dest_path: str, progress_cb=None):
     async with httpx.AsyncClient(follow_redirects=True, timeout=60) as client:
         async with client.stream("GET", url) as r:
@@ -148,17 +136,14 @@ async def download_with_progress(url: str, dest_path: str, progress_cb=None):
                         if progress_cb:
                             await progress_cb(downloaded, total)
 
-# ---- Bot --------------------------------------------------------------------
+# ---- Bot (Modificado para llamar a la función de Selenium) ------------------
 
 @app.on_message(filters.command("download"))
 async def handle_text(_, msg: Message):
-    # Expect: /download <terabox_url>
-    # Proper parsing using Pyrogram's parsed command list
     if not getattr(msg, "command", None) or len(msg.command) < 2:
         return await msg.reply_text("Usage: `/download <terabox_share_url>`", quote=True)
 
     possible_url = msg.command[1]
-    # If user pasted extra text, try to find Terabox link anywhere in message
     m = TERABOX_RX.search(possible_url) or TERABOX_RX.search(msg.text or "")
     if not m:
         return await msg.reply_text("Please send a valid Terabox share URL.", quote=True)
@@ -166,16 +151,17 @@ async def handle_text(_, msg: Message):
     share_url = m.group(0)
     status = await msg.reply_text("⏳ Getting download info…", quote=True)
 
-    # Some hosts need headful to pass Turnstile; we try headless first.
     headless = os.environ.get("HEADLESS", "true").lower() != "false"
     wait_sec = int(os.environ.get("WAIT_SECONDS", "20"))
 
     try:
-        items = await capture_api_json(share_url, wait_seconds=wait_sec, headless=headless)
+        # Ejecutar la función síncrona de Selenium en un hilo para no bloquear el bucle de eventos de asyncio
+        items = await asyncio.to_thread(capture_api_json_selenium, share_url, wait_seconds=wait_sec, headless=headless)
         if not items:
             return await edit_safe(status, "❌ No items found in API response.")
         item = items[0]
     except Exception as e:
+        # sys.exc_info() se puede usar para un traceback más detallado si es necesario
         return await edit_safe(status, f"❌ Failed to capture API JSON:\n`{e}`")
 
     best = pick_best_link(item)
@@ -188,7 +174,6 @@ async def handle_text(_, msg: Message):
     size_h = human(int(size_str)) if size_str and str(size_str).isdigit() else "unknown"
     await edit_safe(status, f"⬇️ Downloading **{filename}** ({size_h})…")
 
-    # Telegram bot practical limit ~2GB (some setups 4GB)
     MAX_BOT_SIZE = int(os.environ.get("MAX_BOT_SIZE_BYTES", str(2 * 1024 * 1024 * 1024)))
 
     tmpdir = tempfile.mkdtemp(prefix="tdl_")
@@ -198,15 +183,14 @@ async def handle_text(_, msg: Message):
         try:
             if total > 0:
                 pct = downloaded * 100 // total
-                if pct % 5 == 0:  # every 5%
+                if pct % 5 == 0:
                     await edit_safe(status, f"⬇️ Downloading **{filename}** — {pct}% ({human(downloaded)}/{human(total)})")
             else:
-                if downloaded % (10 * (1 << 20)) == 0:  # every 10MB
+                if downloaded % (10 * (1 << 20)) == 0:
                     await edit_safe(status, f"⬇️ Downloading **{filename}** — {human(downloaded)}")
         except FloodWait as fw:
             await asyncio.sleep(fw.value)
 
-    # Early size check (if provided)
     if size_str and str(size_str).isdigit():
         if int(size_str) > MAX_BOT_SIZE:
             return await edit_safe(status, f"⚠️ File is {size_h}, which likely exceeds bot send limit. Aborting.")
@@ -218,7 +202,6 @@ async def handle_text(_, msg: Message):
     except Exception as e:
         return await edit_safe(status, f"❌ Download failed:\n`{e}`")
 
-    # Final size check
     try:
         fsize = os.path.getsize(out_path)
         if fsize > MAX_BOT_SIZE:
@@ -236,5 +219,5 @@ async def handle_text(_, msg: Message):
         await msg.reply_document(out_path, caption=caption)
         await status.delete()
 
-    # Optional cleanup:
-    # import shutil; shutil.rmtree(tmpdir, ignore_errors=True) 
+    # import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
+ 
