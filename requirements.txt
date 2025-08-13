@@ -6,4 +6,4 @@ requests
 httpx
 selenium
 selenium-wire 
-webdriver-manager-chrome
+webdriver-manager
