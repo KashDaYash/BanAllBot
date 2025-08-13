@@ -2,8 +2,5 @@ pyrogram
 tgcrypto
 uvloop
 asyncio
-requests
+aiohttp 
 httpx
-selenium
-selenium-wire 
-webdriver-manager
